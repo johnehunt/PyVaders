@@ -21,7 +21,7 @@ FONT = 'space_invaders.ttf'
 BACKGROUND_IMAGE = 'background.jpg'
 
 # Gunship global (constants)
-GUNSHIP_IMAGE_FILE = 'gunship.png'
+GUNSHIP_IMAGE_FILES = ('gunship.png', 'guship_explosion.png')
 GUNSHIP_SPEED = 20
 LASER_SPEED = 20
 
@@ -31,7 +31,7 @@ SAUCER_SPEED = 5
 
 NEW_BOMB_CYCLE_INTERVAL = 30
 EXPLOSION_REFRESH_CYCLE = 10
-SAUCER_CYCLE_INTERVAL = 100
+SAUCER_CYCLE_INTERVAL = 120
 
 BARRIER_POSITION = 450
 INVADER_AREA_TOP = 50
@@ -44,7 +44,7 @@ INVADER_MOVE_DOWN = 2
 INVADER_TYPE_1 = ("invader1.png", 'explosion1.png', 10)
 INVADER_TYPE_2 = ("invader2.png", 'explosion2.png', 20)
 INVADER_TYPE_3 = ("invader3.png", 'explosion3.png', 30)
-INVADER_SAUCER = ("saucer.png", 'saucer_explosion.png', 100)
+INVADER_SAUCER = ("saucer.png", 'saucer_explosion.png', 400)
 LASER = 'laser.png'
 BOMB = 'bomb.png'
 
@@ -77,17 +77,17 @@ class Player:
             current x, y coordinates """
         self.livesText.draw(self.game.display_surface)
         if self.lives == 3:
-            self.game.display_surface.blit(self.life1.image, (self.life1.x, self.life1.y))
+            self.game.display_surface.blit(self.life3.image, (self.life3.x, self.life3.y))
         if self.lives >= 2:
             self.game.display_surface.blit(self.life2.image, (self.life2.x, self.life2.y))
         if self.lives >= 1:
-            self.game.display_surface.blit(self.life3.image, (self.life3.x, self.life3.y))
+            self.game.display_surface.blit(self.life1.image, (self.life1.x, self.life1.y))
 
         score_value_text = Text(FONT, 15, str(self.score), GREEN, 85, 5)
         self.scoreText.draw(self.game.display_surface)
         score_value_text.draw(self.game.display_surface)
 
-    def remove_a_life(self):
+    def loose_life(self):
         self.lives = self.lives - 1
         if self.lives == 0:
             print('Game Over')
@@ -210,22 +210,6 @@ class Bullet(MoveableGameObject):
     def remove(self):
         pass
 
-class Gunship(MoveableGameObject):
-    """ Represents a Gunship"""
-
-    def __init__(self, game):
-        super().__init__(game, GUNSHIP_IMAGE_FILE, GUNSHIP_SPEED)
-        self.x = int(DISPLAY_WIDTH / 2)
-        self.y = int(DISPLAY_HEIGHT - 40)
-
-    def fire_laser(self):
-        laser = Laser(self.game, self.x + (self.width / 2), self.y)
-        self.game.add_laser(laser)
-        laser.play()
-
-    def __str__(self):
-        return 'Gunship(' + str(self.x) + ', ' + str(self.y) + ')'
-
 
 class TargetObject(MoveableGameObject):
 
@@ -239,6 +223,40 @@ class TargetObject(MoveableGameObject):
                 self.game.add_to_player(self.value)
                 if self.game.remove_laser(laser):
                     break
+
+    def rect(self):
+        """ Generates a rectangle representing the objects location
+        and dimensions """
+        return pygame.Rect(self.x, self.row.y, self.width, self.height)
+
+
+class Gunship(MoveableGameObject):
+    """ Represents a Gunship"""
+
+    def __init__(self, game):
+        super().__init__(game, GUNSHIP_IMAGE_FILES[0], GUNSHIP_SPEED)
+        self.x = int(DISPLAY_WIDTH / 2)
+        self.y = int(DISPLAY_HEIGHT - 40)
+        self.explosion_image = GUNSHIP_IMAGE_FILES[1]
+        self.explosion = load_sound_file('invader_explosion.wav')
+
+    def fire_laser(self):
+        laser = Laser(self.game, self.x + (self.width / 2), self.y)
+        self.game.add_laser(laser)
+        laser.play()
+
+    def check_for_collion(self):
+        for bomb in self.game.bombs:
+            if self.rect().colliderect(bomb.rect()):
+                # A bomb hit the gun ship
+                self.image = pygame.image.load(self.explosion_image).convert()
+                self.exploded = True
+                self.explosion.play()
+                self.game.loose_life()
+
+    def __str__(self):
+        return 'Gunship(' + str(self.x) + ', ' + str(self.y) + ')'
+
 
 class Laser(Bullet):
     def __init__(self, game, x, y):
@@ -283,11 +301,6 @@ class Invader(TargetObject):
             self.move_left()
         else:
             self.move_right()
-
-    def rect(self):
-        """ Generates a rectangle representing the objects location
-        and dimensions """
-        return pygame.Rect(self.x, self.row.y, self.width, self.height)
 
     def draw(self):
         """ draw the game object at the
@@ -405,11 +418,13 @@ class Saucer(TargetObject):
 
     def __init__(self, game):
         super().__init__(game, INVADER_SAUCER[0], SAUCER_SPEED)
-        self.value = INVADER_SAUCER[1]
+        self.explosion_image = INVADER_SAUCER[1]
+        self.value = random.randint(1, INVADER_SAUCER[2])
         self.x = 0
         self.y = INVADER_AREA_TOP - 20
         self.exploded = False
         self.sound = load_sound_file('saucer.wav')
+        self.sound.play()
         self.explosion = load_sound_file('saucer_explosion.wav')
 
     def move(self):
@@ -417,6 +432,11 @@ class Saucer(TargetObject):
             self.game.remove_saucer(self)
         else:
             self.move_right()
+
+    def rect(self):
+        """ Generates a rectangle representing the objects location
+        and dimensions """
+        return pygame.Rect(self.x, self.y, self.width, self.height)
 
     def __str__(self):
         return 'Saucer(' + str(self.x) + ', ' + str(self.y) + ')'
@@ -437,9 +457,6 @@ class Game:
     """ Represents the game itself, holds the main game playing loop """
 
     def __init__(self):
-        self.__setup_game()
-
-    def __setup_game(self):
         pygame.init()
         # Set up execution state
         self.is_running = True
@@ -557,6 +574,24 @@ class Game:
 
         self.invaders.determine_direction()
 
+    def _check_for_cycle_events(self, cycle_count):
+        if cycle_count % EXPLOSION_REFRESH_CYCLE == 0:
+            self.invaders.remove_invaders_if_exploded()
+
+        if cycle_count % NEW_BOMB_CYCLE_INTERVAL == 0:
+            self.invaders.select_invader_row_for_bomb()
+
+        if cycle_count % SAUCER_CYCLE_INTERVAL == 0:
+            indicator = random.randint(0, SAUCER_CYCLE_INTERVAL)
+            if (indicator % 2 == 0) and self.saucer is None:
+                self.saucer = Saucer(self)
+
+    def _detect_collisions(self):
+        self.invaders.check_for_collisions()
+        if self.saucer is not None:
+            self.saucer.check_for_collion()
+        self.gunship.check_for_collion()
+
     def remove_saucer(self, saucer):
         self.saucer = None
 
@@ -569,11 +604,6 @@ class Game:
             return True
         return False
 
-    def detect_collisions(self):
-        self.invaders.check_for_collisions()
-        if self.saucer is not None:
-            self.saucer.check_for_collion()
-
     def add_bomb(self, bomb):
         self.bombs.append(bomb)
 
@@ -583,6 +613,9 @@ class Game:
     def game_over(self):
         self.game_over = True
 
+    def loose_life(self):
+        self.player.loose_life()
+
     def play(self):
         cycle_count = 0
         while self.is_running and not self.game_over:
@@ -590,20 +623,11 @@ class Game:
 
             self._handle_user_input()
 
-            if cycle_count % EXPLOSION_REFRESH_CYCLE == 0:
-                self.invaders.remove_invaders_if_exploded()
-
-            if cycle_count % NEW_BOMB_CYCLE_INTERVAL == 0:
-                self.invaders.select_invader_row_for_bomb()
-
-            if cycle_count % SAUCER_CYCLE_INTERVAL == 0:
-                indicator = random.randint(0, SAUCER_CYCLE_INTERVAL)
-                if (indicator % 2 == 0):
-                    self.saucer = Saucer(self)
+            self._check_for_cycle_events(cycle_count)
 
             self._move_game_objects()
 
-            self.detect_collisions()
+            self._detect_collisions()
 
             self._draw_display()
 
