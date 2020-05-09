@@ -27,13 +27,15 @@ LASER_SPEED = 20
 
 BOMB_SPEED = 15
 INVADER_SPEED = 5
-SAUCER_SPEED = 10
+SAUCER_SPEED = 5
 
 NEW_BOMB_CYCLE_INTERVAL = 30
 EXPLOSION_REFRESH_CYCLE = 10
+SAUCER_CYCLE_INTERVAL = 100
 
 BARRIER_POSITION = 450
 INVADER_AREA_TOP = 50
+LASER_AREA_TOP = 10
 
 INVADER_START_Y = INVADER_AREA_TOP
 INVADER_START_X = 50
@@ -42,7 +44,7 @@ INVADER_MOVE_DOWN = 2
 INVADER_TYPE_1 = ("invader1.png", 'explosion1.png', 10)
 INVADER_TYPE_2 = ("invader2.png", 'explosion2.png', 20)
 INVADER_TYPE_3 = ("invader3.png", 'explosion3.png', 30)
-INVADER_SAUCER = ("saucer.png", 100)
+INVADER_SAUCER = ("saucer.png", 'saucer_explosion.png', 100)
 LASER = 'laser.png'
 BOMB = 'bomb.png'
 
@@ -192,7 +194,7 @@ class Bullet(MoveableGameObject):
     def move_up(self):
         """ Move the starship up the screen """
         self.y = self.y - self.speed
-        if self.y < INVADER_AREA_TOP:
+        if self.y < LASER_AREA_TOP:
             self.remove()
 
     def move_down(self):
@@ -208,6 +210,35 @@ class Bullet(MoveableGameObject):
     def remove(self):
         pass
 
+class Gunship(MoveableGameObject):
+    """ Represents a Gunship"""
+
+    def __init__(self, game):
+        super().__init__(game, GUNSHIP_IMAGE_FILE, GUNSHIP_SPEED)
+        self.x = int(DISPLAY_WIDTH / 2)
+        self.y = int(DISPLAY_HEIGHT - 40)
+
+    def fire_laser(self):
+        laser = Laser(self.game, self.x + (self.width / 2), self.y)
+        self.game.add_laser(laser)
+        laser.play()
+
+    def __str__(self):
+        return 'Gunship(' + str(self.x) + ', ' + str(self.y) + ')'
+
+
+class TargetObject(MoveableGameObject):
+
+    def check_for_collion(self):
+        for laser in self.game.lasers:
+            if self.rect().colliderect(laser.rect()):
+                # A laser hit the alien ship
+                self.image = pygame.image.load(self.explosion_image).convert()
+                self.exploded = True
+                self.explosion.play()
+                self.game.add_to_player(self.value)
+                if self.game.remove_laser(laser):
+                    break
 
 class Laser(Bullet):
     def __init__(self, game, x, y):
@@ -227,39 +258,8 @@ class Bomb(Bullet):
         self.game.bombs.remove(self)
 
 
-class Gunship(MoveableGameObject):
-    """ Represents a Gunship"""
 
-    def __init__(self, game):
-        super().__init__(game, GUNSHIP_IMAGE_FILE, GUNSHIP_SPEED)
-        self.x = int(DISPLAY_WIDTH / 2)
-        self.y = int(DISPLAY_HEIGHT - 40)
-
-    def fire_laser(self):
-        laser = Laser(self.game, self.x + (self.width / 2), self.y)
-        self.game.add_laser(laser)
-        laser.play()
-
-    def __str__(self):
-        return 'Gunship(' + str(self.x) + ', ' + str(self.y) + ')'
-
-class Saucer(MoveableGameObject):
-    def __init__(self, game):
-        super().__init__(game, INVADER_SAUCER[0], SAUCER_SPEED)
-        self.value = INVADER_SAUCER[1]
-        self.x = 0
-        self.y = INVADER_AREA_TOP - 20
-        self.exploded = False
-        self.explosion = load_sound_file('saucer.wav')
-
-    def move(self):
-        if self.x + self.width > DISPLAY_WIDTH:
-            self.game.remove_saucer(self)
-        else:
-            self.move_right()
-
-
-class Invader(MoveableGameObject):
+class Invader(TargetObject):
     """ Represents a type of Space Invader in the Game """
 
     def __init__(self, game, row, type, x, column):
@@ -293,17 +293,6 @@ class Invader(MoveableGameObject):
         """ draw the game object at the
             current x, y coordinates """
         self.game.display_surface.blit(self.image, (self.x, self.row.y))
-
-    def check_for_collion(self):
-        for laser in self.game.lasers:
-            if self.rect().colliderect(laser.rect()):
-                # A laser hit the alien ship
-                self.image = pygame.image.load(self.explosion_image).convert()
-                self.exploded = True
-                self.explosion.play()
-                self.game.add_to_player(self.value)
-                if self.game.remove_laser(laser):
-                    break
 
     def __str__(self):
         return 'Invader(' + str(self.x) + ', ' + str(self.row.y) + ')'
@@ -412,6 +401,27 @@ class InvaderSquadren:
         return self.rows.__iter__()
 
 
+class Saucer(TargetObject):
+
+    def __init__(self, game):
+        super().__init__(game, INVADER_SAUCER[0], SAUCER_SPEED)
+        self.value = INVADER_SAUCER[1]
+        self.x = 0
+        self.y = INVADER_AREA_TOP - 20
+        self.exploded = False
+        self.sound = load_sound_file('saucer.wav')
+        self.explosion = load_sound_file('saucer_explosion.wav')
+
+    def move(self):
+        if self.x + self.width > DISPLAY_WIDTH:
+            self.game.remove_saucer(self)
+        else:
+            self.move_right()
+
+    def __str__(self):
+        return 'Saucer(' + str(self.x) + ', ' + str(self.y) + ')'
+
+
 def load_sound_file(filename):
     sound = None
     if filename in SOUNDS:
@@ -505,9 +515,6 @@ class Game:
     def _check_can_fire(self):
         return len(self.lasers) == 0
 
-    def _display_player_details(self):
-        pass
-
     def _handle_user_input(self):
         # Work out what the user wants to do
         for event in pygame.event.get():
@@ -564,6 +571,8 @@ class Game:
 
     def detect_collisions(self):
         self.invaders.check_for_collisions()
+        if self.saucer is not None:
+            self.saucer.check_for_collion()
 
     def add_bomb(self, bomb):
         self.bombs.append(bomb)
@@ -587,7 +596,10 @@ class Game:
             if cycle_count % NEW_BOMB_CYCLE_INTERVAL == 0:
                 self.invaders.select_invader_row_for_bomb()
 
-            self._display_player_details()
+            if cycle_count % SAUCER_CYCLE_INTERVAL == 0:
+                indicator = random.randint(0, SAUCER_CYCLE_INTERVAL)
+                if (indicator % 2 == 0):
+                    self.saucer = Saucer(self)
 
             self._move_game_objects()
 
