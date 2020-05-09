@@ -120,6 +120,9 @@ class ImageGameObject(DrawableGameObject):
     def __init__(self, game, filename):
         super().__init__(game)
         self.filename = filename
+        self.image = None
+        self.width = 0
+        self.height = 0
         self.load_image(filename)
 
     def load_image(self, filename):
@@ -217,7 +220,11 @@ class Bullet(MoveableGameObject):
 
 class TargetObject(MoveableGameObject):
 
-    def check_for_collision  (self):
+    def __init__(self, game, filename, speed):
+        super().__init__(game, filename, speed)
+        self.exploded = False
+
+    def check_for_collision(self):
         for laser in self.game.lasers:
             if self.rect().colliderect(laser.rect()):
                 # A laser hit the alien ship
@@ -485,11 +492,11 @@ class Barriers:
         self.barriers = []
         buffer = 50
         for index in range(NUMBER_OF_BARRIERS):
-                x = buffer + (index * BARRIER_WIDTH)
-                y = BARRIER_POSITION
-                buffer = buffer + 50
-                blocker = Barrier(game, BARRIER_WIDTH, BARRIER_HEIGHT, GREEN, x, y)
-                self.barriers.append(blocker)
+            x = buffer + (index * BARRIER_WIDTH)
+            y = BARRIER_POSITION
+            buffer = buffer + 50
+            blocker = Barrier(game, BARRIER_WIDTH, BARRIER_HEIGHT, GREEN, x, y)
+            self.barriers.append(blocker)
 
     def check_for_collisions(self):
         for barrier in self.barriers:
