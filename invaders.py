@@ -221,7 +221,7 @@ class Laser(Bullet):
 class Bomb(Bullet):
     def __init__(self, game, x, y):
         super().__init__(game, BOMB, x, y, DOWN, BOMB_SPEED)
-        self.sound = load_sound_file('shoot2.wav')
+        self.sound = load_sound_file('bomb.wav')
 
     def remove(self):
         self.game.bombs.remove(self)
