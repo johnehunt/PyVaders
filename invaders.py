@@ -21,7 +21,7 @@ FONT = 'space_invaders.ttf'
 BACKGROUND_IMAGE = 'background.jpg'
 
 # Gunship global (constants)
-GUNSHIP_IMAGE_FILES = ('gunship.png', 'guship_explosion.png')
+GUNSHIP_IMAGE_FILES = ('gunship.png', 'gunship_explosion.png')
 GUNSHIP_SPEED = 20
 LASER_SPEED = 20
 
@@ -33,7 +33,11 @@ NEW_BOMB_CYCLE_INTERVAL = 30
 EXPLOSION_REFRESH_CYCLE = 10
 SAUCER_CYCLE_INTERVAL = 120
 
+NUMBER_OF_BARRIERS = 4
 BARRIER_POSITION = 450
+BARRIER_WIDTH = 80
+BARRIER_HEIGHT = 50
+
 INVADER_AREA_TOP = 50
 LASER_AREA_TOP = 10
 
@@ -239,20 +243,27 @@ class Gunship(MoveableGameObject):
         self.y = int(DISPLAY_HEIGHT - 40)
         self.explosion_image = GUNSHIP_IMAGE_FILES[1]
         self.explosion = load_sound_file('invader_explosion.wav')
+        self.exploded = False
 
     def fire_laser(self):
         laser = Laser(self.game, self.x + (self.width / 2), self.y)
         self.game.add_laser(laser)
         laser.play()
 
-    def check_for_collion(self):
+    def check_for_collison(self):
         for bomb in self.game.bombs:
             if self.rect().colliderect(bomb.rect()):
                 # A bomb hit the gun ship
                 self.image = pygame.image.load(self.explosion_image).convert()
                 self.exploded = True
                 self.explosion.play()
+                self.game.bombs.remove(bomb)
                 self.game.loose_life()
+
+    def refresh(self):
+        if self.exploded:
+            self.exploded = False
+            self.load_image(self.filename)
 
     def __str__(self):
         return 'Gunship(' + str(self.x) + ', ' + str(self.y) + ')'
@@ -274,7 +285,6 @@ class Bomb(Bullet):
 
     def remove(self):
         self.game.bombs.remove(self)
-
 
 
 class Invader(TargetObject):
@@ -344,7 +354,7 @@ class InvaderRow:
 
     def check_for_collisions(self):
         for invader in self.invaders:
-            invader.check_for_collion()
+            invader.check_for_collison()
 
     def remove_invaders_if_exploded(self):
         for invader in self.invaders:
@@ -442,6 +452,54 @@ class Saucer(TargetObject):
         return 'Saucer(' + str(self.x) + ', ' + str(self.y) + ')'
 
 
+class Barrier(DrawableGameObject):
+
+    def __init__(self, game, width, height, colour, x, y):
+        super().__init__(game)
+        self.width = width
+        self.height = height
+        self.colour = colour
+        self.x = x
+        self.y = y
+        self.image = pygame.Surface((self.width, self.height))
+        self.image.fill(self.colour)
+        self.rect = pygame.Rect(self.x, self.y, self.width, self.height)
+
+    def draw(self):
+        self.game.display_surface.blit(self.image, (self.x, self.y))
+
+    def check_for_collision(self):
+        for bomb in self.game.bombs:
+            if self.rect.colliderect(bomb.rect()):
+                # A bomb hit the barrier
+                self.game.bombs.remove(bomb)
+        for laser in self.game.lasers:
+            if self.rect.colliderect(laser.rect()):
+                # A bomb hit the barrier
+                self.game.lasers.remove(laser)
+
+
+class Barriers:
+    def __init__(self, game):
+        self.game = game
+        self.barriers = []
+        buffer = 50
+        for index in range(NUMBER_OF_BARRIERS):
+                x = buffer + (index * BARRIER_WIDTH)
+                y = BARRIER_POSITION
+                buffer = buffer + 50
+                blocker = Barrier(game, BARRIER_WIDTH, BARRIER_HEIGHT, GREEN, x, y)
+                self.barriers.append(blocker)
+
+    def check_for_collisions(self):
+        for barrier in self.barriers:
+            barrier.check_for_collision()
+
+    # Iterable protocol
+    def __iter__(self):
+        return self.barriers.__iter__()
+
+
 def load_sound_file(filename):
     sound = None
     if filename in SOUNDS:
@@ -477,11 +535,13 @@ class Game:
         # set up bombs
         self.bombs = []
         # Game over flag
-        self.game_over = False
+        self.is_game_over = False
         # Player object
         self.player = Player(self)
         # Saucer object
         self.saucer = None
+        # Barriers
+        self.barriers = Barriers(self)
 
     def __display_message(self, message):
         """ Displays a message to the user on the screen """
@@ -525,6 +585,10 @@ class Game:
         # Draw the saucer
         if self.saucer is not None:
             self.saucer.draw()
+
+        # Draw the barriers
+        for barrier in self.barriers:
+            barrier.draw()
 
         # Update the display
         pygame.display.update()
@@ -577,6 +641,7 @@ class Game:
     def _check_for_cycle_events(self, cycle_count):
         if cycle_count % EXPLOSION_REFRESH_CYCLE == 0:
             self.invaders.remove_invaders_if_exploded()
+            self.gunship.refresh()
 
         if cycle_count % NEW_BOMB_CYCLE_INTERVAL == 0:
             self.invaders.select_invader_row_for_bomb()
@@ -589,8 +654,9 @@ class Game:
     def _detect_collisions(self):
         self.invaders.check_for_collisions()
         if self.saucer is not None:
-            self.saucer.check_for_collion()
-        self.gunship.check_for_collion()
+            self.saucer.check_for_collison()
+        self.gunship.check_for_collison()
+        self.barriers.check_for_collisions()
 
     def remove_saucer(self, saucer):
         self.saucer = None
@@ -611,14 +677,14 @@ class Game:
         self.lasers.append(laser)
 
     def game_over(self):
-        self.game_over = True
+        self.is_game_over = True
 
     def loose_life(self):
         self.player.loose_life()
 
     def play(self):
         cycle_count = 0
-        while self.is_running and not self.game_over:
+        while self.is_running and not self.is_game_over:
             cycle_count += 1
 
             self._handle_user_input()
