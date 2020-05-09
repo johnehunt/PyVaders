@@ -217,7 +217,7 @@ class Bullet(MoveableGameObject):
 
 class TargetObject(MoveableGameObject):
 
-    def check_for_collion(self):
+    def check_for_collision  (self):
         for laser in self.game.lasers:
             if self.rect().colliderect(laser.rect()):
                 # A laser hit the alien ship
@@ -354,7 +354,7 @@ class InvaderRow:
 
     def check_for_collisions(self):
         for invader in self.invaders:
-            invader.check_for_collison()
+            invader.check_for_collision()
 
     def remove_invaders_if_exploded(self):
         for invader in self.invaders:
@@ -654,7 +654,7 @@ class Game:
     def _detect_collisions(self):
         self.invaders.check_for_collisions()
         if self.saucer is not None:
-            self.saucer.check_for_collison()
+            self.saucer.check_for_collision()
         self.gunship.check_for_collison()
         self.barriers.check_for_collisions()
 
