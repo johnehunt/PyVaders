@@ -1,6 +1,8 @@
+import random
+import time
 from abc import ABC, abstractmethod
 
-import pygame, random, time
+import pygame
 
 FRAME_REFRESH_RATE = 30
 
@@ -25,6 +27,8 @@ LASER_SPEED = 20
 
 BOMB_SPEED = 15
 INVADER_SPEED = 5
+SAUCER_SPEED = 10
+
 NEW_BOMB_CYCLE_INTERVAL = 30
 EXPLOSION_REFRESH_CYCLE = 10
 
@@ -53,6 +57,7 @@ LIVES_Y_POSITION = 3
 
 SOUNDS = {}
 
+
 class Player:
 
     def __init__(self, game):
@@ -76,15 +81,19 @@ class Player:
         if self.lives >= 1:
             self.game.display_surface.blit(self.life3.image, (self.life3.x, self.life3.y))
 
-        scoreText2 = Text(FONT, 15, str(self.score), GREEN, 85, 5)
+        score_value_text = Text(FONT, 15, str(self.score), GREEN, 85, 5)
         self.scoreText.draw(self.game.display_surface)
-        scoreText2.draw(self.game.display_surface)
+        score_value_text.draw(self.game.display_surface)
 
     def remove_a_life(self):
         self.lives = self.lives - 1
         if self.lives == 0:
             print('Game Over')
             self.game.game_over()
+
+    def add_to_score(self, value):
+        self.score = self.score + value
+
 
 class GameObject(ABC):
     pass
@@ -99,22 +108,18 @@ class DrawableGameObject(GameObject):
     def draw(self):
         pass
 
+
 class ImageGameObject(DrawableGameObject):
 
     def __init__(self, game, filename):
+        super().__init__(game)
         self.filename = filename
         self.load_image(filename)
-        self.game = game
 
     def load_image(self, filename):
         self.image = pygame.image.load(filename).convert()
         self.width = self.image.get_width()
         self.height = self.image.get_height()
-
-    def rect(self):
-        """ Generates a rectangle representing the objects location
-        and dimensions """
-        return pygame.Rect(self.x, self.y, self.width, self.height)
 
     def draw(self):
         """ draw the game object at the
@@ -129,20 +134,50 @@ class Life(ImageGameObject):
         self.x = x
         self.y = y
 
+
 class Text(object):
-    def __init__(self, textFont, size, message, color, xpos, ypos):
-        self.font = pygame.font.Font(textFont, size)
+    def __init__(self, text_font, size, message, color, xpos, ypos):
+        self.font = pygame.font.Font(text_font, size)
         self.surface = self.font.render(message, True, color)
         self.rect = self.surface.get_rect(topleft=(xpos, ypos))
 
     def draw(self, surface):
         surface.blit(self.surface, self.rect)
 
-class Bullet(ImageGameObject):
 
-    def __init__(self, game, filename, x, y, direction, speed):
+class Barrier(DrawableGameObject):
+    """ Represents a barrier wall """
+
+    def __init__(self, game):
+        super().__init__(game)
+
+
+class MoveableGameObject(ImageGameObject):
+
+    def __init__(self, game, filename, speed):
         super().__init__(game, filename)
         self.speed = speed
+        self.x = 0
+        self.y = 0
+
+    def move_right(self):
+        """ moves the object right across the screen """
+        self.x = self.x + self.speed
+
+    def move_left(self):
+        """ Move the object left across the screen """
+        self.x = self.x - self.speed
+
+    def rect(self):
+        """ Generates a rectangle representing the objects location
+        and dimensions """
+        return pygame.Rect(self.x, self.y, self.width, self.height)
+
+
+class Bullet(MoveableGameObject):
+
+    def __init__(self, game, filename, x, y, direction, speed):
+        super().__init__(game, filename, speed)
         self.direction = direction
         self.x = x
         self.y = y
@@ -173,6 +208,7 @@ class Bullet(ImageGameObject):
     def remove(self):
         pass
 
+
 class Laser(Bullet):
     def __init__(self, game, x, y):
         super().__init__(game, LASER, x, y, UP, LASER_SPEED)
@@ -181,6 +217,7 @@ class Laser(Bullet):
     def remove(self):
         self.game.lasers.remove(self)
 
+
 class Bomb(Bullet):
     def __init__(self, game, x, y):
         super().__init__(game, BOMB, x, y, DOWN, BOMB_SPEED)
@@ -188,28 +225,6 @@ class Bomb(Bullet):
 
     def remove(self):
         self.game.bombs.remove(self)
-
-
-class Barrier(DrawableGameObject):
-    """ Represents a barrier wall """
-
-    def __init__(self, game, filename, speed):
-        super().__init__(game, filename)
-
-
-class MoveableGameObject(ImageGameObject):
-
-    def __init__(self, game, filename, speed):
-        super().__init__(game, filename)
-        self.speed = speed
-
-    def move_right(self):
-        """ moves the object right across the screen """
-        self.x = self.x + self.speed
-
-    def move_left(self):
-        """ Move the object left across the screen """
-        self.x = self.x - self.speed
 
 
 class Gunship(MoveableGameObject):
@@ -227,6 +242,21 @@ class Gunship(MoveableGameObject):
 
     def __str__(self):
         return 'Gunship(' + str(self.x) + ', ' + str(self.y) + ')'
+
+class Saucer(MoveableGameObject):
+    def __init__(self, game):
+        super().__init__(game, INVADER_SAUCER[0], SAUCER_SPEED)
+        self.value = INVADER_SAUCER[1]
+        self.x = 0
+        self.y = INVADER_AREA_TOP - 20
+        self.exploded = False
+        self.explosion = load_sound_file('saucer.wav')
+
+    def move(self):
+        if self.x + self.width > DISPLAY_WIDTH:
+            self.game.remove_saucer(self)
+        else:
+            self.move_right()
 
 
 class Invader(MoveableGameObject):
@@ -271,11 +301,13 @@ class Invader(MoveableGameObject):
                 self.image = pygame.image.load(self.explosion_image).convert()
                 self.exploded = True
                 self.explosion.play()
+                self.game.add_to_player(self.value)
                 if self.game.remove_laser(laser):
                     break
 
     def __str__(self):
         return 'Invader(' + str(self.x) + ', ' + str(self.row.y) + ')'
+
 
 class InvaderRow:
 
@@ -298,7 +330,7 @@ class InvaderRow:
         return len(self.invaders)
 
     def select_invader_for_bomb(self):
-        position = random.randint(0, self.get_number_of_invaders()) -1
+        position = random.randint(0, self.get_number_of_invaders()) - 1
         self.invaders[position].drop_bomb()
 
     def move(self):
@@ -333,18 +365,18 @@ class InvaderSquadren:
     def __init__(self, game):
         self.game = game
         self.rows = [InvaderRow(game, self, 0, INVADER_TYPE_1),
-                    InvaderRow(game, self, 1, INVADER_TYPE_1),
-                    InvaderRow(game, self, 2, INVADER_TYPE_2),
-                    InvaderRow(game, self, 3, INVADER_TYPE_2),
-                    InvaderRow(game, self, 4, INVADER_TYPE_3),
-                    InvaderRow(game, self, 5, INVADER_TYPE_3)]
+                     InvaderRow(game, self, 1, INVADER_TYPE_1),
+                     InvaderRow(game, self, 2, INVADER_TYPE_2),
+                     InvaderRow(game, self, 3, INVADER_TYPE_2),
+                     InvaderRow(game, self, 4, INVADER_TYPE_3),
+                     InvaderRow(game, self, 5, INVADER_TYPE_3)]
         self.direction = RIGHT
 
     def get_row_count(self):
         return len(self.rows)
 
     def select_invader_row_for_bomb(self):
-        row = random.randint(0, self.get_row_count()) -1
+        row = random.randint(0, self.get_row_count()) - 1
         self.rows[row].select_invader_for_bomb()
 
     def remove_invaders_if_exploded(self):
@@ -421,6 +453,8 @@ class Game:
         self.game_over = False
         # Player object
         self.player = Player(self)
+        # Saucer object
+        self.saucer = None
 
     def __display_message(self, message):
         """ Displays a message to the user on the screen """
@@ -461,6 +495,10 @@ class Game:
         for bomb in self.bombs:
             bomb.draw()
 
+        # Draw the saucer
+        if self.saucer is not None:
+            self.saucer.draw()
+
         # Update the display
         pygame.display.update()
 
@@ -499,15 +537,24 @@ class Game:
         for laser in self.lasers:
             laser.move()
 
-        # Draw the bombs
+        # Move the bombs
         for bomb in self.bombs:
             bomb.move()
+
+        if self.saucer is not None:
+            self.saucer.move()
 
         # Move the invaders
         for invader_row in self.invaders:
             invader_row.move()
 
         self.invaders.determine_direction()
+
+    def remove_saucer(self, saucer):
+        self.saucer = None
+
+    def add_to_player(self, value):
+        self.player.add_to_score(value)
 
     def remove_laser(self, laser):
         if not laser.persistent:
@@ -526,7 +573,6 @@ class Game:
 
     def game_over(self):
         self.game_over = True
-
 
     def play(self):
         cycle_count = 0
