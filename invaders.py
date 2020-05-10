@@ -15,6 +15,7 @@ RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
+PURPLE = (203, 0, 255)
 BACKGROUND = BLACK
 FONT = 'space_invaders.ttf'
 
@@ -24,6 +25,7 @@ BACKGROUND_IMAGE = 'background.jpg'
 GUNSHIP_IMAGE_FILES = ('gunship.png', 'gunship_explosion.png')
 GUNSHIP_SPEED = 20
 LASER_SPEED = 20
+GUNSHIP_Y_POSITION = int(DISPLAY_HEIGHT - 40)
 
 BOMB_SPEED = 15
 INVADER_SPEED = 5
@@ -34,7 +36,7 @@ EXPLOSION_REFRESH_CYCLE = 10
 SAUCER_CYCLE_INTERVAL = 120
 
 NUMBER_OF_BARRIERS = 4
-BARRIER_POSITION = 450
+BARRIER_POSITION = 500
 BARRIER_WIDTH = 80
 BARRIER_HEIGHT = 50
 
@@ -247,7 +249,7 @@ class Gunship(MoveableGameObject):
     def __init__(self, game):
         super().__init__(game, GUNSHIP_IMAGE_FILES[0], GUNSHIP_SPEED)
         self.x = int(DISPLAY_WIDTH / 2)
-        self.y = int(DISPLAY_HEIGHT - 40)
+        self.y = GUNSHIP_Y_POSITION
         self.explosion_image = GUNSHIP_IMAGE_FILES[1]
         self.explosion = load_sound_file('invader_explosion.wav')
         self.exploded = False
@@ -368,6 +370,11 @@ class InvaderRow:
             if invader.exploded:
                 self.invaders.remove(invader)
 
+    def check_if_invaders_reached_gunship(self):
+        if self.y >= GUNSHIP_Y_POSITION:
+            self.game.game_over()
+            return True
+
     def is_empty(self):
         return len(self.invaders) == 0
 
@@ -410,6 +417,12 @@ class InvaderSquadren:
     def check_for_collisions(self):
         for row in self.rows:
             row.check_for_collisions()
+
+    def check_if_invaders_reached_gunship(self):
+        for row in self.rows:
+            if row.check_if_invaders_reached_gunship():
+                return True
+        return False
 
     def determine_direction(self):
         for row in self.rows:
@@ -550,14 +563,27 @@ class Game:
         # Barriers
         self.barriers = Barriers(self)
 
-    def __display_message(self, message):
+    # def _display_welcome_screen(self):
+    #     self.display_surface.blit(self.background, (0, 0))
+    #     title = Text(FONT, 50, 'Space Invaders', WHITE, 164, 155)
+    #     title.draw(self.display_surface)
+    #     message1 = Text(FONT, 25, 'Press any key to continue', WHITE,
+    #                            201, 225)
+    #     invader1_text = Text(FONT, 25, '   =   10 pts', GREEN, 368, 270)
+    #     invader2_text = Text(FONT, 25, '   =  20 pts', BLUE, 368, 320)
+    #     invader3_text = Text(FONT, 25, '   =  30 pts', PURPLE, 368, 370)
+    #     invader4_text = Text(FONT, 25, '   =  ?????', RED, 368, 420)
+
+    def __display_gameover_message(self):
         """ Displays a message to the user on the screen """
-        text_font = pygame.font.Font('freesansbold.ttf', 48)
-        text_surface = text_font.render(message, True, BLUE, WHITE)
-        text_rectangle = text_surface.get_rect()
-        text_rectangle.center = (DISPLAY_WIDTH / 2, DISPLAY_HEIGHT / 2)
-        self.display_surface.fill(WHITE)
-        self.display_surface.blit(text_surface, text_rectangle)
+        x = DISPLAY_WIDTH / 2 - 70
+        y = DISPLAY_HEIGHT / 2 - 10
+        self.display_surface.blit(self.background, (0, 0))
+        text = Text(FONT, 35, 'Game Over', WHITE, x, y)
+        text.draw(self.display_surface)
+        # Update the display
+        pygame.display.update()
+
 
     def __pause(self):
         paused = True
@@ -700,7 +726,10 @@ class Game:
 
             self._move_game_objects()
 
-            self._detect_collisions()
+            if self.invaders.check_if_invaders_reached_gunship():
+                self.is_game_over = True
+            else:
+                self._detect_collisions()
 
             self._draw_display()
 
@@ -708,10 +737,9 @@ class Game:
             # Should be called once per frame (but only once)
             self.clock.tick(FRAME_REFRESH_RATE)
 
-        self.__display_message("Game Over")
-        self._draw_display()
+        self.__display_gameover_message()
 
-        time.sleep(1)
+        time.sleep(5)
         # Let pygame shutdown gracefully
         pygame.quit()
 
