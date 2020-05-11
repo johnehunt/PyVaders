@@ -7,24 +7,25 @@ import pygame
 FRAME_REFRESH_RATE = 30
 
 DISPLAY_WIDTH = 600
-DISPLAY_HEIGHT = 600
+DISPLAY_HEIGHT = 580
 
 # Set up colours
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
+BARRIER_GREEN = (185, 255, 185)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 PURPLE = (203, 0, 255)
 BACKGROUND = BLACK
-FONT = 'space_invaders.ttf'
+FONT = 'resources/space_invaders.ttf'
 
-BACKGROUND_IMAGE = 'background.jpg'
+BACKGROUND_IMAGE = 'resources/background.jpg'
 
 # Gunship global (constants)
-GUNSHIP_IMAGE_FILES = ('gunship.png', 'gunship_explosion.png')
+GUNSHIP_IMAGE_FILES = ('resources/gunship.png', 'resources/gunship_explosion.png')
 GUNSHIP_SPEED = 20
-LASER_SPEED = 20
+LASER_SPEED = 25
 GUNSHIP_Y_POSITION = int(DISPLAY_HEIGHT - 40)
 
 BOMB_SPEED = 15
@@ -36,9 +37,9 @@ EXPLOSION_REFRESH_CYCLE = 10
 SAUCER_CYCLE_INTERVAL = 120
 
 NUMBER_OF_BARRIERS = 4
-BARRIER_POSITION = 500
+BARRIER_POSITION = 480
 BARRIER_WIDTH = 80
-BARRIER_HEIGHT = 50
+BARRIER_HEIGHT = 30
 
 INVADER_AREA_TOP = 50
 LASER_AREA_TOP = 10
@@ -47,12 +48,12 @@ INVADER_START_Y = INVADER_AREA_TOP
 INVADER_START_X = 50
 INVADER_MOVE_DOWN = 2
 
-INVADER_TYPE_1 = ("invader1.png", 'explosion1.png', 10)
-INVADER_TYPE_2 = ("invader2.png", 'explosion2.png', 20)
-INVADER_TYPE_3 = ("invader3.png", 'explosion3.png', 30)
-INVADER_SAUCER = ("saucer.png", 'saucer_explosion.png', 400)
-LASER = 'laser.png'
-BOMB = 'bomb.png'
+INVADER_TYPE_1 = ("resources/invader1.png", 'resources/explosion1.png', 10)
+INVADER_TYPE_2 = ("resources/invader2.png", 'resources/explosion2.png', 20)
+INVADER_TYPE_3 = ("resources/invader3.png", 'resources/explosion3.png', 30)
+INVADER_SAUCER = ("resources/saucer.png", 'resources/saucer_explosion.png', 400)
+LASER = 'resources/laser.png'
+BOMB = 'resources/bomb.png'
 
 UP = 'U'
 DOWN = 'D'
@@ -64,6 +65,24 @@ MAX_INVADERS_IN_ROW = 9
 LIVES_Y_POSITION = 3
 
 SOUNDS = {}
+
+
+class ImageCache:
+
+    def __init__(self):
+        self.images = {}  # Dictionary if images
+
+    def get(self, filename):
+        if filename in self.images:
+            # Image in Cache
+            return self.images[filename]
+        else:
+            image = pygame.image.load(filename).convert()
+            self.images[filename] = image
+            return image
+
+
+IMAGE_CACHE = ImageCache()
 
 
 class Player:
@@ -128,7 +147,7 @@ class ImageGameObject(DrawableGameObject):
         self.load_image(filename)
 
     def load_image(self, filename):
-        self.image = pygame.image.load(filename).convert()
+        self.image = IMAGE_CACHE.get(filename)
         self.width = self.image.get_width()
         self.height = self.image.get_height()
 
@@ -140,7 +159,7 @@ class ImageGameObject(DrawableGameObject):
 
 class Life(ImageGameObject):
     def __init__(self, game, x, y):
-        super().__init__(game, 'gunship.png')
+        super().__init__(game, 'resources/gunship.png')
         self.image = pygame.transform.scale(self.image, (23, 23))
         self.x = x
         self.y = y
@@ -154,13 +173,6 @@ class Text(object):
 
     def draw(self, surface):
         surface.blit(self.surface, self.rect)
-
-
-class Barrier(DrawableGameObject):
-    """ Represents a barrier wall """
-
-    def __init__(self, game):
-        super().__init__(game)
 
 
 class MoveableGameObject(ImageGameObject):
@@ -192,7 +204,7 @@ class Bullet(MoveableGameObject):
         self.direction = direction
         self.x = x
         self.y = y
-        self.sound = load_sound_file('shoot.wav')
+        self.sound = load_sound_file('resources/shoot.wav')
 
     def move(self):
         if self.direction == UP:
@@ -251,7 +263,7 @@ class Gunship(MoveableGameObject):
         self.x = int(DISPLAY_WIDTH / 2)
         self.y = GUNSHIP_Y_POSITION
         self.explosion_image = GUNSHIP_IMAGE_FILES[1]
-        self.explosion = load_sound_file('invader_explosion.wav')
+        self.explosion = load_sound_file('resources/invader_explosion.wav')
         self.exploded = False
 
     def fire_laser(self):
@@ -263,7 +275,7 @@ class Gunship(MoveableGameObject):
         for bomb in self.game.bombs:
             if self.rect().colliderect(bomb.rect()):
                 # A bomb hit the gun ship
-                self.image = pygame.image.load(self.explosion_image).convert()
+                self.image = IMAGE_CACHE.get(self.explosion_image)
                 self.exploded = True
                 self.explosion.play()
                 self.game.bombs.remove(bomb)
@@ -290,7 +302,7 @@ class Laser(Bullet):
 class Bomb(Bullet):
     def __init__(self, game, x, y):
         super().__init__(game, BOMB, x, y, DOWN, BOMB_SPEED)
-        self.sound = load_sound_file('bomb.wav')
+        self.sound = load_sound_file('resources/bomb.wav')
 
     def remove(self):
         self.game.bombs.remove(self)
@@ -307,7 +319,7 @@ class Invader(TargetObject):
         self.x = x
         self.column = column
         self.exploded = False
-        self.explosion = load_sound_file('invader_explosion.wav')
+        self.explosion = load_sound_file('resources/invader_explosion.wav')
 
     def drop_bomb(self):
         bomb = Bomb(self.game, self.x + (self.width / 2), self.row.y)
@@ -424,6 +436,9 @@ class InvaderSquadren:
                 return True
         return False
 
+    def is_empty(self):
+        return len(self.rows) == 0
+
     def determine_direction(self):
         for row in self.rows:
             for invader in row:
@@ -453,9 +468,9 @@ class Saucer(TargetObject):
         self.x = 0
         self.y = INVADER_AREA_TOP - 20
         self.exploded = False
-        self.sound = load_sound_file('saucer.wav')
+        self.sound = load_sound_file('resources/saucer.wav')
         self.sound.play()
-        self.explosion = load_sound_file('saucer_explosion.wav')
+        self.explosion = load_sound_file('resources/saucer_explosion.wav')
 
     def move(self):
         if self.x + self.width > DISPLAY_WIDTH:
@@ -471,13 +486,12 @@ class Saucer(TargetObject):
     def __str__(self):
         return 'Saucer(' + str(self.x) + ', ' + str(self.y) + ')'
 
+class BarrierBlock(DrawableGameObject):
 
-class Barrier(DrawableGameObject):
-
-    def __init__(self, game, width, height, colour, x, y):
+    def __init__(self, game, colour, x, y):
         super().__init__(game)
-        self.width = width
-        self.height = height
+        self.width = 10
+        self.height = 10
         self.colour = colour
         self.x = x
         self.y = y
@@ -485,8 +499,10 @@ class Barrier(DrawableGameObject):
         self.image.fill(self.colour)
         self.rect = pygame.Rect(self.x, self.y, self.width, self.height)
 
+
     def draw(self):
         self.game.display_surface.blit(self.image, (self.x, self.y))
+
 
     def check_for_collision(self):
         for bomb in self.game.bombs:
@@ -498,6 +514,44 @@ class Barrier(DrawableGameObject):
                 # A bomb hit the barrier
                 self.game.lasers.remove(laser)
 
+class Barrier(DrawableGameObject):
+
+    def __init__(self, game, width, height, colour, x, y):
+        super().__init__(game)
+        self.blocks = []
+        width_range = int(width / 10)
+        height_range = int(height / 10)
+        for pos_x in range(width_range):
+            for pos_y in range(height_range):
+                block = BarrierBlock(self.game, colour, x + int(pos_x * 10), y + int(pos_y * 10))
+                self.blocks.append(block)
+
+    def draw(self):
+        for block in self.blocks:
+            block.draw()
+
+    def check_for_collision(self):
+        for bomb in self.game.bombs:
+            for block in self.blocks:
+                if block.rect.colliderect(bomb.rect()):
+                    # A bomb hit the barrier
+                    self.game.bombs.remove(bomb)
+                    self.blocks.remove(block)
+                    break
+        for laser in self.game.lasers:
+            for block in self.blocks:
+                if block.rect.colliderect(laser.rect()):
+                    # A laser hit the barrier
+                    self.game.lasers.remove(laser)
+                    self.blocks.remove(block)
+                    break
+        for row in self.game.invaders.rows:
+            for invader in row.invaders:
+                for block in self.blocks:
+                    if block.rect.colliderect(invader.rect()):
+                        self.blocks.remove(block)
+                        break
+
 
 class Barriers:
     def __init__(self, game):
@@ -508,7 +562,7 @@ class Barriers:
             x = buffer + (index * BARRIER_WIDTH)
             y = BARRIER_POSITION
             buffer = buffer + 50
-            blocker = Barrier(game, BARRIER_WIDTH, BARRIER_HEIGHT, GREEN, x, y)
+            blocker = Barrier(game, BARRIER_WIDTH, BARRIER_HEIGHT, BARRIER_GREEN, x, y)
             self.barriers.append(blocker)
 
     def check_for_collisions(self):
@@ -563,27 +617,49 @@ class Game:
         # Barriers
         self.barriers = Barriers(self)
 
-    # def _display_welcome_screen(self):
-    #     self.display_surface.blit(self.background, (0, 0))
-    #     title = Text(FONT, 50, 'Space Invaders', WHITE, 164, 155)
-    #     title.draw(self.display_surface)
-    #     message1 = Text(FONT, 25, 'Press any key to continue', WHITE,
-    #                            201, 225)
-    #     invader1_text = Text(FONT, 25, '   =   10 pts', GREEN, 368, 270)
-    #     invader2_text = Text(FONT, 25, '   =  20 pts', BLUE, 368, 320)
-    #     invader3_text = Text(FONT, 25, '   =  30 pts', PURPLE, 368, 370)
-    #     invader4_text = Text(FONT, 25, '   =  ?????', RED, 368, 420)
+    def _display_welcome_screen(self):
+        self.display_surface.blit(self.background, (0, 0))
+        title = Text(FONT, 50, 'Space Invaders', WHITE, 50, 155)
+        title.draw(self.display_surface)
+        continue_text = Text(FONT, 25, 'Press space to continue', WHITE, 100, 225)
+        continue_text.draw(self.display_surface)
+        invader_text = Text(FONT, 25, '   =   10 pts', PURPLE, 250, 270)
+        invader_text.draw(self.display_surface)
+        image = IMAGE_CACHE.get(INVADER_TYPE_1[0])
+        self.display_surface.blit(image, (200, 270))
+        invader_text = Text(FONT, 25, '   =  20 pts', GREEN, 250, 320)
+        invader_text.draw(self.display_surface)
+        image = IMAGE_CACHE.get(INVADER_TYPE_2[0])
+        self.display_surface.blit(image, (200, 320))
+        invader_text = Text(FONT, 25, '   =  30 pts', BLUE, 250, 370)
+        invader_text.draw(self.display_surface)
+        image = IMAGE_CACHE.get(INVADER_TYPE_3[0])
+        self.display_surface.blit(image, (200, 370))
+        invader_text = Text(FONT, 25, '   =  ?????', RED, 250, 420)
+        invader_text.draw(self.display_surface)
+        image = IMAGE_CACHE.get(INVADER_SAUCER[0])
+        self.display_surface.blit(image, (200, 420))
+        # Update the display
+        pygame.display.update()
+        # Wait for a key to be pressed
+        pygame.event.wait()
+        proceed = False
+        while not proceed:
+            for event in pygame.event.get():
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_SPACE:
+                        proceed = True
+                        break
 
     def __display_gameover_message(self):
         """ Displays a message to the user on the screen """
-        x = DISPLAY_WIDTH / 2 - 70
+        x = DISPLAY_WIDTH / 2 - 100
         y = DISPLAY_HEIGHT / 2 - 10
         self.display_surface.blit(self.background, (0, 0))
         text = Text(FONT, 35, 'Game Over', WHITE, x, y)
         text.draw(self.display_surface)
         # Update the display
         pygame.display.update()
-
 
     def __pause(self):
         paused = True
@@ -598,7 +674,7 @@ class Game:
         # Clear the screen of current contents
         self.display_surface.blit(self.background, (0, 0))
 
-        # Draw player detials
+        # Draw player details
         self.player.draw()
 
         # Draw the invaders and the gunship
@@ -671,6 +747,9 @@ class Game:
 
         self.invaders.determine_direction()
 
+    def __check_if_all_invaders_destoryed(self):
+        return self.invaders.is_empty()
+
     def _check_for_cycle_events(self, cycle_count):
         if cycle_count % EXPLOSION_REFRESH_CYCLE == 0:
             self.invaders.remove_invaders_if_exploded()
@@ -683,6 +762,9 @@ class Game:
             indicator = random.randint(0, SAUCER_CYCLE_INTERVAL)
             if (indicator % 2 == 0) and self.saucer is None:
                 self.saucer = Saucer(self)
+
+    def __check_if_invaders_reached_gunship(self):
+        return self.invaders.check_if_invaders_reached_gunship()
 
     def _detect_collisions(self):
         self.invaders.check_for_collisions()
@@ -716,6 +798,7 @@ class Game:
         self.player.loose_life()
 
     def play(self):
+        self._display_welcome_screen()
         cycle_count = 0
         while self.is_running and not self.is_game_over:
             cycle_count += 1
@@ -726,10 +809,10 @@ class Game:
 
             self._move_game_objects()
 
-            if self.invaders.check_if_invaders_reached_gunship():
+            if self.__check_if_invaders_reached_gunship():
                 self.is_game_over = True
-            else:
-                self._detect_collisions()
+
+            self._detect_collisions()
 
             self._draw_display()
 
@@ -737,9 +820,12 @@ class Game:
             # Should be called once per frame (but only once)
             self.clock.tick(FRAME_REFRESH_RATE)
 
+            if self.__check_if_all_invaders_destoryed():
+                break
+
         self.__display_gameover_message()
 
-        time.sleep(5)
+        time.sleep(2)
         # Let pygame shutdown gracefully
         pygame.quit()
 
