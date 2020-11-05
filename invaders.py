@@ -24,8 +24,8 @@ BACKGROUND_IMAGE = 'resources/background.jpg'
 
 # Gunship global (constants)
 GUNSHIP_IMAGE_FILES = ('resources/gunship.png', 'resources/gunship_explosion.png')
-GUNSHIP_SPEED = 20
-LASER_SPEED = 25
+GUNSHIP_SPEED = 18
+LASER_SPEED = 35
 GUNSHIP_Y_POSITION = int(DISPLAY_HEIGHT - 40)
 
 BOMB_SPEED = 15
@@ -414,8 +414,9 @@ class InvaderSquadren:
         return len(self.rows)
 
     def select_invader_row_for_bomb(self):
-        row = random.randint(0, self.get_row_count()) - 1
-        self.rows[row].select_invader_for_bomb()
+        if len(self.rows) != 0:
+            row = random.randint(0, self.get_row_count()) - 1
+            self.rows[row].select_invader_for_bomb()
 
     def remove_invaders_if_exploded(self):
         for row in self.rows:
